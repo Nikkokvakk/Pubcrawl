@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Simple Pub Crawl Planner</title>
+    <title>Oslo Pub Crawl Planner</title>
     <style>
+        /* Style section remains the same */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -34,10 +35,12 @@
             border-radius: 4px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
 
         .input-group {
             display: flex;
+            flex-direction: column;
             gap: 10px;
             margin-bottom: 20px;
         }
@@ -59,21 +62,50 @@
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            flex-grow: 1;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .delete-btn {
             background-color: #ff4444;
             padding: 4px 8px;
         }
+
+        #search-results {
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .search-result-item {
+            padding: 8px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .search-result-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .pub-details {
+            font-size: 0.8em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div id="left-panel">
-        <h2>Pub Crawl Planner</h2>
+        <h2>Oslo Pub Crawl Planner</h2>
         <div class="input-group">
-            <input type="text" id="pubName" placeholder="Enter pub name">
-            <button onclick="addPub()">Add</button>
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Søk etter en pub..."
+            >
+            <div id="search-results"></div>
         </div>
         <div class="pub-list" id="pubList"></div>
     </div>
@@ -83,6 +115,8 @@
         let map;
         let markers = [];
         let pubs = [];
+        let searchService;
+        let placesService;
 
         // Load saved pubs from localStorage
         function loadSavedPubs() {
@@ -100,45 +134,106 @@
         }
 
         function initMap() {
-            // Center on London by default
+            // Center on Oslo
+            const osloCenter = { lat: 59.9139, lng: 10.7522 };
             map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 51.5074, lng: -0.1278 },
+                center: osloCenter,
                 zoom: 13
             });
 
-            // Add click listener to map
-            map.addListener('click', function(e) {
-                const pubName = document.getElementById('pubName').value;
-                if (pubName) {
-                    addPubAtLocation(pubName, e.latLng);
-                } else {
-                    alert('Please enter a pub name first');
-                }
-            });
+            searchService = new google.maps.places.AutocompleteService();
+            placesService = new google.maps.places.PlacesService(map);
 
+            setupSearchInput();
             loadSavedPubs();
         }
 
-        function addPub() {
-            const pubName = document.getElementById('pubName').value;
-            if (pubName) {
-                // Add pub at a random location near London for demo purposes
-                const lat = 51.5074 + (Math.random() - 0.5) * 0.02;
-                const lng = -0.1278 + (Math.random() - 0.5) * 0.02;
-                addPubAtLocation(pubName, { lat, lng });
-            }
+        function setupSearchInput() {
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('search-results');
+            let timeout = null;
+
+            searchInput.addEventListener('input', function() {
+                clearTimeout(timeout);
+                const query = this.value;
+
+                if (query.length > 2) {
+                    timeout = setTimeout(() => {
+                        searchPubs(query);
+                    }, 300);
+                } else {
+                    searchResults.style.display = 'none';
+                }
+            });
+
+            // Hide search results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchResults.contains(e.target) && e.target !== searchInput) {
+                    searchResults.style.display = 'none';
+                }
+            });
         }
 
-        function addPubAtLocation(name, location) {
-            const pub = {
-                name: name,
-                lat: location.lat(),
-                lng: location.lng()
+        function searchPubs(query) {
+            const request = {
+                input: query + ' pub',
+                types: ['establishment'],
+                componentRestrictions: { country: 'no' }, // Restrict to Norway
+                bounds: new google.maps.LatLngBounds(
+                    { lat: 59.8, lng: 10.6 }, // SW bounds of Oslo
+                    { lat: 60.0, lng: 10.9 }  // NE bounds of Oslo
+                )
             };
+
+            searchService.getPlacePredictions(request, (predictions, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    displaySearchResults(predictions);
+                }
+            });
+        }
+
+        function displaySearchResults(predictions) {
+            const searchResults = document.getElementById('search-results');
+            searchResults.innerHTML = '';
+            searchResults.style.display = 'block';
+
+            predictions.forEach(prediction => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `
+                    <div>${prediction.structured_formatting.main_text}</div>
+                    <div class="pub-details">${prediction.structured_formatting.secondary_text}</div>
+                `;
+                div.onclick = () => selectPub(prediction);
+                searchResults.appendChild(div);
+            });
+        }
+
+        function selectPub(prediction) {
+            const request = {
+                placeId: prediction.place_id,
+                fields: ['name', 'geometry', 'formatted_address']
+            };
+
+            placesService.getDetails(request, (place, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    addPub({
+                        name: place.name,
+                        address: place.formatted_address,
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng()
+                    });
+                }
+            });
+
+            document.getElementById('searchInput').value = '';
+            document.getElementById('search-results').style.display = 'none';
+        }
+
+        function addPub(pub) {
             pubs.push(pub);
             updatePubList();
             addMarker(pub);
-            document.getElementById('pubName').value = '';
             savePubs();
         }
 
@@ -149,7 +244,10 @@
                 const div = document.createElement('div');
                 div.className = 'pub-item';
                 div.innerHTML = `
-                    <span>${index + 1}. ${pub.name}</span>
+                    <div>
+                        <div>${index + 1}. ${pub.name}</div>
+                        <div class="pub-details">${pub.address}</div>
+                    </div>
                     <button class="delete-btn" onclick="removePub(${index})">×</button>
                 `;
                 pubList.appendChild(div);
@@ -167,11 +265,8 @@
         }
 
         function updateMarkers() {
-            // Clear existing markers
             markers.forEach(marker => marker.setMap(null));
             markers = [];
-            
-            // Add markers for all pubs
             pubs.forEach(pub => addMarker(pub));
         }
 
@@ -191,7 +286,7 @@
         }
     </script>
     <script async defer
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCuLnDuxB2H7gayTSXHcEtu4KMPJtC59w8&callback=initMap">
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCuLnDuxB2H7gayTSXHcEtu4KMPJtC59w8&libraries=places&callback=initMap">
     </script>
 </body>
 </html>
