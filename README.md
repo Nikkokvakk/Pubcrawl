@@ -19,7 +19,7 @@ git clone [your-repository-url]
 - Create a new project
 - Enable the Maps JavaScript API
 - Create credentials (API key)
-- Replace `YOUR_API_KEY_HERE` in index.html with your API key
+- Replace `YOUR_API_KEY_HERE` in index.html with your API key (AIzaSyCuLnDuxB2H7gayTSXHcEtu4KMPJtC59w8)
 
 3. Open index.html in your web browser
 
