@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Pub Crawl Planner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        #left-panel {
+            width: 300px;
+        }
+
+        #map {
+            flex-grow: 1;
+            height: 100vh;
+            border-radius: 8px;
+        }
+
+        .pub-list {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .pub-item {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex-grow: 1;
+        }
+
+        .delete-btn {
+            background-color: #ff4444;
+            padding: 4px 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="left-panel">
+        <h2>Pub Crawl Planner</h2>
+        <div class="input-group">
+            <input type="text" id="pubName" placeholder="Enter pub name">
+            <button onclick="addPub()">Add</button>
+        </div>
+        <div class="pub-list" id="pubList"></div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        let map;
+        let markers = [];
+        let pubs = [];
+
+        // Load saved pubs from localStorage
+        function loadSavedPubs() {
+            const savedPubs = localStorage.getItem('pubs');
+            if (savedPubs) {
+                pubs = JSON.parse(savedPubs);
+                updatePubList();
+                updateMarkers();
+            }
+        }
+
+        // Save pubs to localStorage
+        function savePubs() {
+            localStorage.setItem('pubs', JSON.stringify(pubs));
+        }
+
+        function initMap() {
+            // Center on London by default
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 51.5074, lng: -0.1278 },
+                zoom: 13
+            });
+
+            // Add click listener to map
+            map.addListener('click', function(e) {
+                const pubName = document.getElementById('pubName').value;
+                if (pubName) {
+                    addPubAtLocation(pubName, e.latLng);
+                } else {
+                    alert('Please enter a pub name first');
+                }
+            });
+
+            loadSavedPubs();
+        }
+
+        function addPub() {
+            const pubName = document.getElementById('pubName').value;
+            if (pubName) {
+                // Add pub at a random location near London for demo purposes
+                const lat = 51.5074 + (Math.random() - 0.5) * 0.02;
+                const lng = -0.1278 + (Math.random() - 0.5) * 0.02;
+                addPubAtLocation(pubName, { lat, lng });
+            }
+        }
+
+        function addPubAtLocation(name, location) {
+            const pub = {
+                name: name,
+                lat: location.lat(),
+                lng: location.lng()
+            };
+            pubs.push(pub);
+            updatePubList();
+            addMarker(pub);
+            document.getElementById('pubName').value = '';
+            savePubs();
+        }
+
+        function updatePubList() {
+            const pubList = document.getElementById('pubList');
+            pubList.innerHTML = '';
+            pubs.forEach((pub, index) => {
+                const div = document.createElement('div');
+                div.className = 'pub-item';
+                div.innerHTML = `
+                    <span>${index + 1}. ${pub.name}</span>
+                    <button class="delete-btn" onclick="removePub(${index})">×</button>
+                `;
+                pubList.appendChild(div);
+            });
+        }
+
+        function addMarker(pub) {
+            const marker = new google.maps.Marker({
+                position: { lat: pub.lat, lng: pub.lng },
+                map: map,
+                title: pub.name
+            });
+            markers.push(marker);
+            fitMapToBounds();
+        }
+
+        function updateMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => marker.setMap(null));
+            markers = [];
+            
+            // Add markers for all pubs
+            pubs.forEach(pub => addMarker(pub));
+        }
+
+        function removePub(index) {
+            pubs.splice(index, 1);
+            updatePubList();
+            updateMarkers();
+            savePubs();
+        }
+
+        function fitMapToBounds() {
+            if (markers.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                markers.forEach(marker => bounds.extend(marker.getPosition()));
+                map.fitBounds(bounds);
+            }
+        }
+    </script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&callback=initMap">
+    </script>
+</body>
+</html>
