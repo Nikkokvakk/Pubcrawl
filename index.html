@@ -98,7 +98,7 @@
 </head>
 <body>
     <div id="left-panel">
-        <h2>Oslo Pub Crawl Planner</h2>
+        <h2>Pub Crawl Planner</h2>
         <div class="input-group">
             <input 
                 type="text" 
@@ -176,18 +176,23 @@
 
         function searchPubs(query) {
             const request = {
-                input: query + ' pub',
-                types: ['establishment'],
+                input: query,
+                location: new google.maps.LatLng(59.9139, 10.7522), // Oslo center
+                radius: 20000, // 20km radius to include Lillestrøm (about 18km from Oslo center)
                 componentRestrictions: { country: 'no' }, // Restrict to Norway
                 bounds: new google.maps.LatLngBounds(
-                    { lat: 59.8, lng: 10.6 }, // SW bounds of Oslo
-                    { lat: 60.0, lng: 10.9 }  // NE bounds of Oslo
+                    { lat: 59.8, lng: 10.6 }, // Expanded SW bounds
+                    { lat: 60.0, lng: 11.1 }  // Expanded NE bounds to include Lillestrøm
                 )
             };
+            // Removed types restriction to allow all places
 
             searchService.getPlacePredictions(request, (predictions, status) => {
                 if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    console.log('Found predictions:', predictions); // Debug line
                     displaySearchResults(predictions);
+                } else {
+                    console.log('Search status:', status); // Debug line
                 }
             });
         }
@@ -197,15 +202,22 @@
             searchResults.innerHTML = '';
             searchResults.style.display = 'block';
 
+            if (predictions.length === 0) {
+                searchResults.innerHTML = '<div class="search-result-item">Ingen resultater funnet</div>';
+                return;
+            }
+
             predictions.forEach(prediction => {
-                const div = document.createElement('div');
-                div.className = 'search-result-item';
-                div.innerHTML = `
-                    <div>${prediction.structured_formatting.main_text}</div>
-                    <div class="pub-details">${prediction.structured_formatting.secondary_text}</div>
-                `;
-                div.onclick = () => selectPub(prediction);
-                searchResults.appendChild(div);
+                if (prediction.structured_formatting) {
+                    const div = document.createElement('div');
+                    div.className = 'search-result-item';
+                    div.innerHTML = `
+                        <div>${prediction.structured_formatting.main_text}</div>
+                        <div class="pub-details">${prediction.structured_formatting.secondary_text || ''}</div>
+                    `;
+                    div.onclick = () => selectPub(prediction);
+                    searchResults.appendChild(div);
+                }
             });
         }
 
